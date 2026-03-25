@@ -2,7 +2,7 @@
 name = "mogu-memory"
 version = "0.1.0"
 description = "Long-term memory system for Claude Code sessions"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
     "sentence-transformers>=3.0.0",
     "sqlite-vec>=0.1.0",

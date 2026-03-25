@@ -7,7 +7,7 @@ It stores conversation transcripts as Q&A chunks with hybrid search (FTS5 + vect
 
 ## Tech Stack
 
-- **Language**: Python 3.10+
+- **Language**: Python 3.14+
 - **Database**: SQLite + FTS5 (trigram) + sqlite-vec
 - **Embedding**: Ruri v3-310m (sentence-transformers, 310-dim, local CPU)
 - **CLI**: Click
