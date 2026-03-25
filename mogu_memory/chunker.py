@@ -47,6 +47,23 @@ def _extract_text_from_message(msg: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+def _is_noise_message(text: str) -> bool:
+    """Check if a message is noise (slash commands, tool results only, etc.)."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    # Slash commands: <command-name>/foo</command-name>
+    if "<command-name>" in stripped:
+        return True
+    # Tool result only messages (no human-readable content)
+    if stripped.startswith("[Result]") and "\n" not in stripped:
+        return True
+    # Local command caveats
+    if "<local-command-caveat>" in stripped:
+        return True
+    return False
+
+
 def _split_long_text(text: str, max_chars: int) -> list[str]:
     """Split text that exceeds max_chars into smaller pieces at paragraph boundaries."""
     if len(text) <= max_chars:
@@ -142,6 +159,10 @@ def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) 
     for msg in messages:
         role = msg.get("role", "")
         text = _extract_text_from_message(msg)
+
+        # Skip slash commands and system-generated messages
+        if _is_noise_message(text):
+            continue
 
         if role == "human" or role == "user":
             # If we have a pending pair, save it

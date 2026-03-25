@@ -20,7 +20,7 @@ class Config:
 
     # Embedding model
     embedding_model: str = "cl-nagoya/ruri-v3-310m"
-    embedding_dim: int = 310
+    embedding_dim: int = 768
 
     # Search parameters
     rrf_k: int = 60
