@@ -141,5 +141,23 @@ def stats(ctx: click.Context) -> None:
         click.echo(f"  {path}: {p['cnt']} memories")
 
 
+@cli.command()
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
+@click.pass_context
+def reset(ctx: click.Context, yes: bool) -> None:
+    """Delete all memories from the database."""
+    config = ctx.obj["config"]
+
+    if not config.db_path.exists():
+        click.echo("Database does not exist. Nothing to reset.")
+        return
+
+    if not yes:
+        click.confirm("All memories will be deleted. Continue?", abort=True)
+
+    config.db_path.unlink()
+    click.echo("Database reset complete.")
+
+
 if __name__ == "__main__":
     cli()
