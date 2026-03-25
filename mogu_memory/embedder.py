@@ -21,7 +21,21 @@ class Embedder:
     def model(self):
         """Lazy-load the embedding model."""
         if self._model is None:
+            import logging
+            import os
+            import warnings
+
+            # Suppress noisy warnings before importing heavy libraries
+            os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+            os.environ.setdefault("TQDM_DISABLE", "1")
+            os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+            os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+            warnings.filterwarnings("ignore", message=".*reference_compile.*")
+
             from sentence_transformers import SentenceTransformer
+
+            # Must set after import — importing resets log levels
+            logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
             self._model = SentenceTransformer(self.config.embedding_model)
         return self._model
