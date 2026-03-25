@@ -78,11 +78,39 @@ def _split_long_text(text: str, max_chars: int) -> list[str]:
     return result
 
 
+def _parse_transcript_line(obj: dict[str, Any]) -> dict[str, Any] | None:
+    """Parse a single line from a Claude Code transcript JSONL.
+
+    Claude Code transcripts use a nested format:
+        {"type": "user"|"assistant", "message": {"role": "...", "content": "..."}, ...}
+    Non-message lines (file-history-snapshot, system, etc.) are skipped.
+    """
+    line_type = obj.get("type", "")
+
+    # Only process user and assistant messages
+    if line_type not in ("user", "assistant"):
+        return None
+
+    # Skip meta/system messages (e.g. tool results from local commands)
+    if obj.get("isMeta"):
+        return None
+
+    message = obj.get("message")
+    if message and isinstance(message, dict):
+        return message
+
+    # Fallback: if "role" exists at top level (flat format)
+    if "role" in obj:
+        return obj
+
+    return None
+
+
 def chunk_transcript(transcript_path: str | Path, max_chunk_chars: int = 4000) -> list[Chunk]:
     """Parse a Claude Code transcript (JSONL) and chunk into Q&A pairs.
 
-    The transcript is a JSONL file where each line is a message with
-    "role" (human/assistant) and "content" fields.
+    Supports the nested Claude Code transcript format:
+        {"type": "user", "message": {"role": "user", "content": "..."}, ...}
     """
     path = Path(transcript_path)
     messages = []
@@ -93,10 +121,13 @@ def chunk_transcript(transcript_path: str | Path, max_chunk_chars: int = 4000) -
             if not line:
                 continue
             try:
-                msg = json.loads(line)
-                messages.append(msg)
+                obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            msg = _parse_transcript_line(obj)
+            if msg:
+                messages.append(msg)
 
     return chunk_messages(messages, max_chunk_chars)
 

@@ -68,13 +68,21 @@ def test_chunk_long_text_split():
 
 
 def test_chunk_transcript_from_file():
-    messages = [
-        {"role": "human", "content": "What is 2+2?"},
-        {"role": "assistant", "content": "4"},
+    lines = [
+        {
+            "type": "user",
+            "message": {"role": "user", "content": "What is 2+2?"},
+            "uuid": "1",
+        },
+        {
+            "type": "assistant",
+            "message": {"role": "assistant", "content": "4"},
+            "uuid": "2",
+        },
     ]
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-        for msg in messages:
-            f.write(json.dumps(msg) + "\n")
+        for obj in lines:
+            f.write(json.dumps(obj) + "\n")
         path = f.name
 
     chunks = chunk_transcript(path)
@@ -103,3 +111,68 @@ def test_chunk_user_role_alias():
     ]
     chunks = chunk_messages(messages)
     assert len(chunks) == 1
+
+
+def test_chunk_transcript_nested_format():
+    """Real Claude Code transcript uses nested format with type/message fields."""
+    lines = [
+        {"type": "file-history-snapshot", "messageId": "abc"},
+        {
+            "type": "user",
+            "message": {"role": "user", "content": "Explain decorators"},
+            "isMeta": False,
+            "uuid": "1",
+        },
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Decorators wrap functions."}],
+            },
+            "uuid": "2",
+        },
+    ]
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        for obj in lines:
+            f.write(json.dumps(obj) + "\n")
+        path = f.name
+
+    chunks = chunk_transcript(path)
+    assert len(chunks) == 1
+    assert "decorator" in chunks[0].question.lower()
+    assert "wrap" in chunks[0].answer.lower()
+
+    Path(path).unlink()
+
+
+def test_chunk_transcript_skips_meta():
+    """Meta messages (isMeta=True) should be skipped."""
+    lines = [
+        {
+            "type": "user",
+            "message": {"role": "user", "content": "system caveat"},
+            "isMeta": True,
+            "uuid": "1",
+        },
+        {
+            "type": "user",
+            "message": {"role": "user", "content": "What is Python?"},
+            "isMeta": False,
+            "uuid": "2",
+        },
+        {
+            "type": "assistant",
+            "message": {"role": "assistant", "content": "A programming language."},
+            "uuid": "3",
+        },
+    ]
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        for obj in lines:
+            f.write(json.dumps(obj) + "\n")
+        path = f.name
+
+    chunks = chunk_transcript(path)
+    assert len(chunks) == 1
+    assert "Python" in chunks[0].question
+
+    Path(path).unlink()

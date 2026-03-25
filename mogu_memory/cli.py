@@ -80,11 +80,28 @@ def save(ctx: click.Context, session_id: str, transcript: str, project: str | No
 @click.pass_context
 def search(ctx: click.Context, query: str, top_k: int | None, project: str | None, json_output: bool) -> None:
     """Search memories for a query."""
+    if not query.strip():
+        click.echo("No results found.")
+        return
+
     config = ctx.obj["config"]
+
+    if not config.db_path.exists():
+        click.echo("No results found.")
+        return
+
+    from mogu_memory.db import MemoryDB
+
+    db = MemoryDB(config)
+    stats = db.get_stats()
+    if stats["total_memories"] == 0:
+        db.close()
+        click.echo("No results found.")
+        return
 
     from mogu_memory.searcher import Searcher
 
-    searcher = Searcher(config=config)
+    searcher = Searcher(db=db, config=config)
     results = searcher.search(query, top_k=top_k, project_path=project)
 
     if not results:
