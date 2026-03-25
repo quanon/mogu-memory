@@ -170,9 +170,8 @@ def chunk_transcript(transcript_path: str | Path, max_chunk_chars: int = 4000) -
     return chunk_messages(messages, max_chunk_chars)
 
 
-def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) -> list[Chunk]:
-    """Chunk a list of messages into Q&A pairs."""
-    # Group into (human, assistant) pairs
+def _pair_messages(messages: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """Group messages into (question, answer) pairs, filtering noise."""
     pairs: list[tuple[str, str]] = []
     current_human = ""
     current_assistant = ""
@@ -211,7 +210,11 @@ def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) 
     if current_human and current_assistant:
         pairs.append((current_human.strip(), current_assistant.strip()))
 
-    # Convert pairs to chunks, splitting long ones
+    return pairs
+
+
+def _pairs_to_chunks(pairs: list[tuple[str, str]], max_chunk_chars: int) -> list[Chunk]:
+    """Convert Q&A pairs to Chunk objects, splitting long answers."""
     chunks: list[Chunk] = []
     idx = 0
 
@@ -246,3 +249,9 @@ def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) 
                 idx += 1
 
     return chunks
+
+
+def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) -> list[Chunk]:
+    """Chunk a list of messages into Q&A pairs."""
+    pairs = _pair_messages(messages)
+    return _pairs_to_chunks(pairs, max_chunk_chars)
