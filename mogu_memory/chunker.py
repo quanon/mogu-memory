@@ -18,13 +18,40 @@ class Chunk:
     chunk_index: int
 
 
+def _is_tool_result_only(msg: dict[str, Any]) -> bool:
+    """Check if a message consists only of tool_result blocks (no human text)."""
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return False
+    if not isinstance(content, list):
+        return False
+    return all(
+        isinstance(b, dict) and b.get("type") == "tool_result"
+        for b in content
+    )
+
+
+def _is_tool_use_only(msg: dict[str, Any]) -> bool:
+    """Check if a message consists only of tool_use blocks (no text response)."""
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return False
+    if not isinstance(content, list):
+        return False
+    has_text = any(
+        isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip()
+        for b in content
+    )
+    return not has_text
+
+
 def _extract_text_from_message(msg: dict[str, Any]) -> str:
-    """Extract plain text from a message, handling various content formats."""
+    """Extract human-readable text from a message, ignoring tool blocks."""
     content = msg.get("content", "")
     if isinstance(content, str):
         return content
 
-    # Handle list of content blocks (e.g., text, tool_use, tool_result)
+    # Only extract text blocks, skip tool_use/tool_result
     parts = []
     for block in content:
         if isinstance(block, str):
@@ -32,18 +59,6 @@ def _extract_text_from_message(msg: dict[str, Any]) -> str:
         elif isinstance(block, dict):
             if block.get("type") == "text":
                 parts.append(block.get("text", ""))
-            elif block.get("type") == "tool_use":
-                tool_name = block.get("name", "unknown")
-                tool_input = json.dumps(block.get("input", {}), ensure_ascii=False)
-                parts.append(f"[Tool: {tool_name}] {tool_input}")
-            elif block.get("type") == "tool_result":
-                result_content = block.get("content", "")
-                if isinstance(result_content, str):
-                    parts.append(f"[Result] {result_content}")
-                elif isinstance(result_content, list):
-                    for rc in result_content:
-                        if isinstance(rc, dict) and rc.get("type") == "text":
-                            parts.append(f"[Result] {rc.get('text', '')}")
     return "\n".join(parts)
 
 
@@ -58,8 +73,13 @@ def _is_noise_message(text: str) -> bool:
     # Tool result only messages (no human-readable content)
     if stripped.startswith("[Result]") and "\n" not in stripped:
         return True
-    # Local command caveats
+    # Local command caveats / stdout
     if "<local-command-caveat>" in stripped:
+        return True
+    if "<local-command-stdout>" in stripped:
+        return True
+    # Single-word permission responses (Yes, No, y, n, etc.)
+    if stripped.lower() in ("yes", "no", "y", "n", "ok"):
         return True
     return False
 
@@ -159,6 +179,15 @@ def chunk_messages(messages: list[dict[str, Any]], max_chunk_chars: int = 4000) 
 
     for msg in messages:
         role = msg.get("role", "")
+
+        # Skip tool_result-only user messages (automated responses to tool calls)
+        if role in ("human", "user") and _is_tool_result_only(msg):
+            continue
+
+        # Skip tool_use-only assistant messages (intermediate tool calls)
+        if role == "assistant" and _is_tool_use_only(msg):
+            continue
+
         text = _extract_text_from_message(msg)
 
         # Skip slash commands and system-generated messages

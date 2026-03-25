@@ -52,7 +52,36 @@ def test_chunk_handles_content_blocks():
     ]
     chunks = chunk_messages(messages)
     assert len(chunks) == 1
-    assert "Read" in chunks[0].answer
+    assert "read" in chunks[0].answer.lower()
+
+
+def test_chunk_skips_tool_result_only_messages():
+    """tool_result-only user messages should not pollute the question."""
+    messages = [
+        {"role": "user", "content": "Review this PR"},
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr view 123"}},
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"tool_use_id": "toolu_1", "type": "tool_result", "content": "PR title: Fix bug"},
+            ],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "This PR fixes a bug in the login flow."},
+            ],
+        },
+    ]
+    chunks = chunk_messages(messages)
+    assert len(chunks) == 1
+    assert chunks[0].question == "Review this PR"
+    assert "login" in chunks[0].answer
 
 
 def test_chunk_long_text_split():
