@@ -66,6 +66,7 @@ def _is_noise_message(text: str) -> bool:
 
 def _split_long_text(text: str, max_chars: int) -> list[str]:
     """Split text that exceeds max_chars into smaller pieces at paragraph boundaries."""
+    max_chars = max(max_chars, 200)  # Guard against zero/negative values
     if len(text) <= max_chars:
         return [text]
 

@@ -37,9 +37,15 @@ class Embedder:
         vec = self.model.encode(f"検索クエリ: {query}", normalize_embeddings=True)
         return vec.tolist()
 
-    def embed_batch(self, texts: list[str], is_query: bool = False) -> list[list[float]]:
+    def embed_batch(self, texts: list[str], is_query: bool = False, batch_size: int = 1) -> list[list[float]]:
         """Generate embeddings for a batch of texts."""
         prefix = "検索クエリ: " if is_query else "検索文書: "
-        prefixed = [f"{prefix}{t}" for t in texts]
-        vecs = self.model.encode(prefixed, normalize_embeddings=True, show_progress_bar=False)
+        # Truncate to 1000 chars to avoid OOM on long tool results
+        prefixed = [f"{prefix}{t[:1000]}" for t in texts]
+        vecs = self.model.encode(
+            prefixed,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+            batch_size=batch_size,
+        )
         return [v.tolist() for v in vecs]
